@@ -1,0 +1,174 @@
+---
+title: "Topics in reproducible social science"
+author: "Mats Ahrenshop"
+date: "20 May 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Reproducibility and research transparency
+
+1. Ethical research
+- IRB
+- Fraud \& unintentional bias
+
+2. Pre-registration and pre-analysis plans
+- Purpose: publication bias \& researcher degrees freedom
+- [EGAP](http://egap.org/design-registrations)
+- [PAP example](https://github.com/mahrenshop/experimental_methods2020/blob/master/lab%20materials/week%204/christensen%20et%20al%20PAP.pdf)
+
+3. Replication and reproducibility
+- Reproducible code
+- Data sharing
+- [R Markdown](https://r4ds.had.co.nz/communicate-intro.html)
+- [github](https://happygitwithr.com/)
+
+# Pre-Analysis Plans
+
+## Research hypotheses
+1. Causal parameter (estimand) + threats to inference via exclusion restriction and non-interference
+2. Sign and magnitude: prior beliefs about parameter
+3. Heterogeneous treatment effects: specification of important subgroups
+
+
+## Treatment description
+
+- Context
+- Treatment administration
+- Information environment
+
+## Inclusion of subjects
+- Criteria for inclusion / eligibility for random assignment
+- Population and sampling method
+- Sample restrictions
+
+## Random assignment
+
+- Assignment procedure: via random number seed and automated procedure
+- Handling of bad randomizations
+- Simple (complete) random assignment vs blocked assignment vs clustered assignment
+- Probabilities of assignment to conditions
+- Flow diagram of allocation procedure (sampling, allocation, delivery of treatment, attrition)
+
+## Soundness of randomization procedure
+
+- Covariate balance: integrity of randomization procedure
+- Magnitude of imbalance and statistical tests
+- Randomization inference: imbalance magnitude expected by chance?
+- Review random assignment procedure
+
+## Outcome measures
+
+- Justification for measurement instruments
+- Validity
+- Describe attrition
+- Collection of outcome data
+- Define what constitute non-compliance with treatment
+
+## Data analysis
+
+- Distribution of outcomes for each condition
+- Avg. outcomes + sd for each condition
+- ATE + SE
+- Regression with and without covariates
+- Randomization inference to test sharp H0 no effect
+- Variance in outcomes, test for heterogeneity
+- Address non-compliance, interference, and attrition
+
+## Ethics
+- IRB approval for research involving human subjects
+- Discussion of
+  * Harmful interventions and risk to subjects (minimal risk; mitigate losses; induce positive treatments)
+  * Obtaining informed consent and secure withdrawal from study: subjects understand information on risk; voluntarily enter into an agreement: actively consent; may withdraw from participation
+  *Protection of anonymity and confidentiality
+
+
+# DeclareDesign
+
+Describes research design in code (declare design); simulate designs to understand their properties (diagnose design) (such as power, bias, RMSE).
+
+Load packages
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(DeclareDesign)
+library(fabricatr)
+library(randomizr)
+library(estimatr)
+library(DesignLibrary)
+```
+
+Declare a design
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(1234)
+
+simple_design <-
+  # M: model
+  
+  # a 100-unit population with an unobserved shock 'u'
+  
+  declare_population(N = 100, u = rnorm(N)) +
+  
+  # 2 potential outcomes, where Y_Z_0 is the unobserved shock 'u'
+  # and Y_Z_1 is that plus treatment effect, let's say 0.25
+  
+  declare_potential_outcomes(Y_Z_0 = u, Y_Z_1 = Y_Z_0 + 0.25) +
+  
+  
+  # I: inquiry
+  
+  declare_estimand(PATE = mean(Y_Z_1 - Y_Z_0)) +
+  
+  # D: data strategy
+  
+  # we randomly sample 50 of the 100 units in the population
+  
+  declare_sampling(n = 50) +
+  
+  # randomly assign half of the 50 to treatment and control
+  
+  declare_assignment(prob = 0.5) +
+  
+  # construct observed outcomes from potential outcomes depending on realized assignment Z
+  declare_reveal(outcome_variables = Y, assignment_variables = Z) +
+  
+  # A: answer strategy
+  
+  declare_estimator(Y ~ Z, model = difference_in_means, estimand = "PATE")
+
+simple_design
+```
+
+
+For diagnosing designs, we define a set of diagnosands (statistical properties of the design, such as power, bias, RMSE).
+
+
+```{r, message=FALSE, warning=FALSE}
+simple_design_diagnosands <-
+  declare_diagnosands(select = c(bias, rmse, power))
+
+# now simulate design again and again, and calculate diagnosands based on the simulation data
+# simulations of the DGP, then calculate estimands, and estimates
+
+simple_design_diagnosands <-
+  diagnose_design(simple_design, diagnosands = simple_design_diagnosands, sims = 500)
+
+simple_design_diagnosands
+```
+
+
+The package \texttt{DesignLibrary} has many designs stored already:
+
+```{r, message=FALSE, warning=FALSE}
+b_c_design <- block_cluster_two_arm_designer(N = 1000, N_blocks = 10)
+b_c_design
+
+diagnose_design(b_c_design)
+```
+
+
+
